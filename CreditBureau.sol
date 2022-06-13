@@ -177,6 +177,10 @@ contract Loan {
   }
 
   function withdraw() public {}
+
+  function findDelinquents() public view returns (address[] memory, uint[] memory) {
+    assert(false);
+  }
 }
 
 struct FicoScore {
