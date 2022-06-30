@@ -31,17 +31,15 @@ contract CreditBureau {
     // FIXME: Use amountRequested
   }
 
-  function updateScore(address client, uint amount, bool borrow) public {
+  function updateScoreBorrow(uint amount) public {
     // FIXME: scores should be adapted to FICO range (Chris will fix everything)
-    if (borrow) {
-      // Requested a loan; score goes down.
-      _creditScores[client].score -= amount;
-    } else {
-      // Repaid loan; score does up.
-      _creditScores[client].score+= amount;
-    }
+      _creditScores[tx.origin].score -= amount;
   }
-
+  function updateScoreRepayment(uint amount) public {
+    // FIXME: scores should be adapted to FICO range (Chris will fix everything)
+      _creditScores[tx.origin].score += amount;
+  }
+  
   function loanPaymentScoreUpdate(address client, address loan, uint amount) public {
     require(msg.sender == loan, "");
   }
@@ -173,15 +171,22 @@ contract Loan {
     payable(msg.sender).transfer(amount);
   }
 
-  function makePayment(unit payment) public payable {
-    unit exp_payment = ceil(_originalOwed[msg.sender]/_num_payments);
-    uint pOwed = _remainingOwed[msg.sender];
-    uint ipOwed = _idealRemainingOwed[msg.sender];
-    uint interest = ceil(pOwed*interestRatePerMil/(12*1000000));
-    uint exp_interest = ceil(ipOwed*interestRatePerMil/(12*1000000));
-    _remainingOwed[msg.sender] = pOwed - payment + interest;
-    _idealRemainingOwed[msg.sender] = ipOwed - exp_payment + exp_interest;
-    // Call loanRepaymentUpdateScore
+  function calculateInterest(unit owed) {
+    
+  }
+  
+  function makePayment() public payable {
+    uint payment = msg.value;
+    uint expPayment = floor(_originalOwed[msg.sender]/_num_payments)+1;
+    uint rOwed = _remainingOwed[msg.sender];
+    uint irOwed = _idealRemainingOwed[msg.sender];
+    uint interest = calculateInterest(rOwed);
+    uint expInterest = calculateInterest(irOwed);
+    _remainingOwed[msg.sender] = rOwed - payment + interest;
+    _idealRemainingOwed[msg.sender] = irOwed - expPayment + expInterest;
+    if (_remainingOwed[msg.sender] >= _idealRemainingOwed[msg.sender]) {
+      _bureau.updateScoreRepayment(_remainingOwed[msg.sender] - _idealRemainingOwed[msg.sender]);
+    }
   }
 
   function withdraw() public {}
