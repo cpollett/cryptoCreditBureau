@@ -100,6 +100,7 @@ contract Loan {
 
   mapping(address => uint) private _borrowers;
   mapping(address => uint) private _remainingOwed;
+  mapping(address => uint) private _idealRemainingOwed;
 
   mapping(address => uint) private _investors;
 
@@ -172,7 +173,14 @@ contract Loan {
     payable(msg.sender).transfer(amount);
   }
 
-  function makePayment() public payable {
+  function makePayment(unit payment) public payable {
+    unit exp_payment = ceil(_originalOwed[msg.sender]/_num_payments);
+    uint pOwed = _remainingOwed[msg.sender];
+    uint ipOwed = _idealRemainingOwed[msg.sender];
+    uint interest = ceil(pOwed*interestRatePerMil/(12*1000000));
+    uint exp_interest = ceil(ipOwed*interestRatePerMil/(12*1000000));
+    _remainingOwed[msg.sender] = pOwed - payment + interest;
+    _idealRemainingOwed[msg.sender] = ipOwed - exp_payment + exp_interest;
     // Call loanRepaymentUpdateScore
   }
 
