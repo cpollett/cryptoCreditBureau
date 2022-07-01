@@ -73,7 +73,7 @@ contract CreditBureau {
   }
 
   function findLoan(uint amountNeeded) public returns (Loan) {
-    for (uint8 i=0; i<_availableLoans.length; i++) {
+    for (uint8 i=0; i < _availableLoans.length; i++) {
       Loan loan = _availableLoans[i];
       if (loan.getAmount() > amountNeeded) {
         return loan;
@@ -171,13 +171,15 @@ contract Loan {
     payable(msg.sender).transfer(amount);
   }
 
-  function calculateInterest(unit owed) {
+  function calculateInterest(uint owed) {
+    uint secondsPerYear = 365*86400 + 86400/4; //365.25 * seconds/day
+    uint ratePerMilPayment = (_interestRatePerMil * _secondsBetweenPayments)/secondsPerYear;
     
   }
   
   function makePayment() public payable {
     uint payment = msg.value;
-    uint expPayment = floor(_originalOwed[msg.sender]/_num_payments)+1;
+    uint expPayment = floor(_originalOwed[msg.sender]/_numPayments)+1;
     uint rOwed = _remainingOwed[msg.sender];
     uint irOwed = _idealRemainingOwed[msg.sender];
     uint interest = calculateInterest(rOwed);
