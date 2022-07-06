@@ -31,8 +31,9 @@ contract CreditBureau {
     // FIXME: Use amountRequested
   }
 
-  function updateScore(address client, uint amount, bool borrow) public {
+  function updateScore(uint amount, bool borrow) public {
     // FIXME: scores should be adapted to FICO range (Chris will fix everything)
+    address client=tx.origin;
     if (borrow) {
       // Requested a loan; score goes down.
       _creditScores[client].score -= amount;
@@ -142,7 +143,7 @@ contract Loan {
     _borrowers[msg.sender] = amount;
     _amountBorrowed += amount;
 
-    _bureau.updateScore(msg.sender, amount, true);
+    _bureau.updateScore(amount, true);
     if (isReady()) {
       _timeLoanStart = block.timestamp;
     }
@@ -176,11 +177,16 @@ contract Loan {
     // Call loanRepaymentUpdateScore
   }
 
-  function withdraw() public {}
 
-  function findDelinquents() public view returns (address[] memory, uint[] memory) {
-    assert(false);
+  function withdraw(uint amount) public {
+    uint current$$$=address(this).balance;   
+    require(current$$$ - amount >= 0, "Insufficient funds in the account");
+    require(_investors[msg.sender] >= amount, "Withdraw less or equal your investment");  
+   //FIXME to include interest rate
+    _investors[msg.sender] =  _investors[msg.sender] - amount;
+    payable(msg.sender).transfer(amount);
   }
+
 }
 
 struct FicoScore {
