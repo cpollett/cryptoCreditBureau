@@ -39,7 +39,7 @@ contract CreditBureau {
     // FIXME: scores should be adapted to FICO range (Chris will fix everything)
       _creditScores[tx.origin].score += amount;
   }
-  
+
   function loanPaymentScoreUpdate(address client, address loan, uint amount) public {
     require(msg.sender == loan, "");
   }
@@ -90,7 +90,7 @@ contract Loan {
   // We enforce that lenders cannot finish contributing until all borrowers have contributed.
   uint private _amountBorrowed;
   uint private _amountInvested;
-  
+
   uint private _totalAmount;
   uint private _interestRatePerMil;
   uint private _numPayments;
@@ -121,7 +121,7 @@ contract Loan {
 
     _bureau = bureau;
     _totalAmount = totalAmount;
-    
+
     _interestRatePerMil = interestRatePerMil;
     _numPayments = numPayments;
     _secondsBetweenPayments = secondsBetweenPayments;
@@ -137,11 +137,11 @@ contract Loan {
     require(creditScore > _minCreditScore, "Insufficient credit score");
     require(_borrowers[msg.sender] == 0, "Can't borrow twice");
     require(_amountBorrowed + amount <= _totalAmount, "Not enough ether left to borrow");
-    
+
     _borrowers[msg.sender] = amount;
     _amountBorrowed += amount;
 
-    _bureau.updateScore(msg.sender, amount, true);
+    _bureau.updateScoreBorrow(msg.sender, amount, true);
     if (isReady()) {
       _timeLoanStart = block.timestamp;
     }
@@ -174,9 +174,9 @@ contract Loan {
   function calculateInterest(uint owed) {
     uint secondsPerYear = 365*86400 + 86400/4; //365.25 * seconds/day
     uint ratePerMilPayment = (_interestRatePerMil * _secondsBetweenPayments)/secondsPerYear;
-    
+
   }
-  
+
   function makePayment() public payable {
     uint payment = msg.value;
     uint expPayment = floor(_originalOwed[msg.sender]/_numPayments)+1;
@@ -191,7 +191,14 @@ contract Loan {
     }
   }
 
-  function withdraw() public {}
+  function withdraw(uint amount) public {
+    uint current$$$=address(this).balance;
+    require(current$$$ - amount >= 0, "Insufficient funds in the account");
+    require(_investors[msg.sender] >= amount, "Withdraw less or equal your investment");
+   //FIXME to include interest rate
+    _investors[msg.sender] =  _investors[msg.sender] - amount;
+    payable(msg.sender).transfer(amount);
+  }
 
   function findDelinquents() public view returns (address[] memory, uint[] memory) {
     assert(false);
@@ -202,4 +209,3 @@ struct FicoScore {
     uint score;
     uint timestamp;
 }
-
