@@ -176,13 +176,18 @@ contract Loan {
   function numPaymentsBetweenTimestamps(uint timestamp1, uint timestamp2) public view returns (uint) {
     require(timestamp1 >= timestamp2, "We require the first timestamp to be most recent");
     uint diffTimestamp1Funding = timestamp1 - _timeLoanStart;
+    diffTimestamp1Funding = (diffTimestamp1Funding > diffTimestamp1Funding) ? _numPayments : diffTimestamp1Funding;
     uint numTimestamp1PaymentsSinceFunding = diffTimestamp1Funding / _secondsBetweenPayments;
     uint diffTimestamp2Funding = timestamp2 - _timeLoanStart;
+    diffTimestamp2Funding = (diffTimestamp2Funding > diffTimestamp2Funding) ? _numPayments : diffTimestamp2Funding;
     uint numTimestamp2PaymentsSinceFunding = diffTimestamp2Funding / _secondsBetweenPayments;
     return numTimestamp1PaymentsSinceFunding - numTimestamp2PaymentsSinceFunding;
   }
 
   function calculateInterest(uint owed, uint numPayments) public view returns (uint) {
+    if (numPayments <= 0) {
+      return 0;
+    }
     uint secondsPerYear = 365*86400 + 86400/4; //365.25 * seconds/day
     uint ratePerMilPayment = (_interestRatePerMil * _secondsBetweenPayments)/secondsPerYear;
     uint milAugmentInterest = owed * ((1000000 + ratePerMilPayment) ** numPayments);
