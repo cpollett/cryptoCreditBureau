@@ -96,14 +96,16 @@ contract Loan {
   uint private _numPayments;
   uint private _secondsBetweenPayments;
 
-  mapping(address => uint) private _borrowers;
+  mapping(address => uint) private _borrower;
+  mapping(address => uint) private _borrowerExpectedPayment;
+  mapping(address => uint) private _borrowerLastPayment;
   mapping(address => uint) private _remainingOwed;
   mapping(address => uint) private _idealRemainingOwed;
 
   mapping(address => uint) private _investors;
+  mapping(address => uint) private _investorLastWithdraw;
 
   uint private _minCreditScore;
-  //uint private _minNumberBorrowers;
   uint private _timeLoanStart;
 
   CreditBureau private _bureau;
@@ -135,12 +137,12 @@ contract Loan {
   function borrow(uint amount) public {
     uint creditScore = _bureau.getScore(msg.sender, amount);
     require(creditScore > _minCreditScore, "Insufficient credit score");
-    require(_borrowers[msg.sender] == 0, "Can't borrow twice");
+    require(_borrower[msg.sender] == 0, "Can't borrow twice");
     require(_amountBorrowed + amount <= _totalAmount, "Not enough ether left to borrow");
-
-    _borrowers[msg.sender] = amount;
+    _borrower[msg.sender] = amount;
+    uint costOfLoan = calculateInterest(amount, _numPayments) + amount;
+    _borrowerExpectedPayment[msg.sender] = costOfLoan / _numPayments;
     _amountBorrowed += amount;
-
     _bureau.updateScoreBorrow(msg.sender, amount, true);
     if (isReady()) {
       _timeLoanStart = block.timestamp;
@@ -163,41 +165,67 @@ contract Loan {
 
   function get$$$() public payable {
     require(isReady(), "Loan is waiting for lenders and borrowers");
-    require(_borrowers[msg.sender] > 0, "No money allocated for you to borrow");
-    uint amount = _borrowers[msg.sender];
-    _borrowers[msg.sender] = 0;
+    require(_borrower[msg.sender] > 0, "No money allocated for you to borrow");
+    uint amount = _borrower[msg.sender];
+    _borrower[msg.sender] = 0;
     // FIXME: add interest
     _remainingOwed[msg.sender] = amount;
     payable(msg.sender).transfer(amount);
   }
 
-  function calculateInterest(uint owed) {
+  function numPaymentsBetweenTimestamps(uint timestamp1, uint timestamp2) {
+    require(timestamp1 >= timestamp2, "We require the first timestamp to be most recent");
+    uint diffTimestamp1Funding = timestamp1 - _timeLoanStart;
+    uint numTimestamp1PaymentsSinceFunding = diffTimestamp1Funding / _secondsBetweenPayments;
+    uint diffTimestamp2Funding = timestamp2 - _timeLoanStart;
+    uint numTimestamp2PaymentsSinceFunding = diffTimestamp2Funding / _secondsBetweenPayments;
+    return numTimestamp1PaymentsSinceFunding - numTimestamp2PaymentsSinceFunding;
+  }
+
+  function calculateInterest(uint owed, uint numPayments) {
     uint secondsPerYear = 365*86400 + 86400/4; //365.25 * seconds/day
     uint ratePerMilPayment = (_interestRatePerMil * _secondsBetweenPayments)/secondsPerYear;
-
+    uint milAugmentInterest = owed * ((1000000 + ratePerMilPayment) ** numPayments);
+    uint newAmountOwed = milAugmentInterest / (1000000 ** numPaymentsSinceLastCalculated);
+    return newAmountOwed - owed;
   }
 
   function makePayment() public payable {
     uint payment = msg.value;
-    uint expPayment = floor(_originalOwed[msg.sender]/_numPayments)+1;
+    uint expPayment = _borrowerExpectedPayment[msg.sender];
     uint rOwed = _remainingOwed[msg.sender];
     uint irOwed = _idealRemainingOwed[msg.sender];
-    uint interest = calculateInterest(rOwed);
-    uint expInterest = calculateInterest(irOwed);
+    uint numPaymentsSinceLastCalculated = numPaymentsBetweenTimestamps(
+      block.timestamp, _borrowerLastPayment[msg.sender]);
+    uint interest = calculateInterest(rOwed, numPaymentsSinceLastCalculated);
+    uint expInterest = calculateInterest(irOwed, numPaymentsSinceLastCalculated);
     _remainingOwed[msg.sender] = rOwed - payment + interest;
     _idealRemainingOwed[msg.sender] = irOwed - expPayment + expInterest;
+    _borrowerLastPayment[msg.sender] = block.timestamp;
     if (_remainingOwed[msg.sender] >= _idealRemainingOwed[msg.sender]) {
-      _bureau.updateScoreRepayment(_remainingOwed[msg.sender] - _idealRemainingOwed[msg.sender]);
+      _bureau.updateScoreRepayment(_remainingOwed[msg.sender] -
+        _idealRemainingOwed[msg.sender]);
     }
   }
 
   function withdraw(uint amount) public {
     uint current$$$=address(this).balance;
     require(current$$$ - amount >= 0, "Insufficient funds in the account");
-    require(_investors[msg.sender] >= amount, "Withdraw less or equal your investment");
-   //FIXME to include interest rate
-    _investors[msg.sender] =  _investors[msg.sender] - amount;
+    uint numPaymentsSinceLastCalculated = numPaymentsBetweenTimestamps(
+      block.timestamp, _investorLastWithdraw[msg.sender]);
+    uint investorBalance = _investors[msg.sender];
+    investorBalance = investorBalance + calculateInterest(investorBalance,
+      numPaymentsSinceLastCalculated);
+    require(investorBalance >= amount, "Withdraw less or equal your investment");
+    _investors[msg.sender] = investorBalance - amount;
+    _investorLastWithdraw[msg.sender] = block.timestamp;
     payable(msg.sender).transfer(amount);
+    /*
+       remark: it could be the case that all investors have zero'd out their
+       investments and interest is still being paid by the borrowers, in which
+       case any remaining money should probably go to the credit bureau (how
+       bureau makes money)
+     */
   }
 
   function findDelinquents() public view returns (address[] memory, uint[] memory) {
