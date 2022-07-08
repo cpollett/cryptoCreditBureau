@@ -143,7 +143,7 @@ contract Loan {
     uint costOfLoan = calculateInterest(amount, _numPayments) + amount;
     _borrowerExpectedPayment[msg.sender] = costOfLoan / _numPayments;
     _amountBorrowed += amount;
-    _bureau.updateScoreBorrow(msg.sender, amount, true);
+    _bureau.updateScoreBorrow(amount);
     if (isReady()) {
       _timeLoanStart = block.timestamp;
     }
@@ -173,7 +173,7 @@ contract Loan {
     payable(msg.sender).transfer(amount);
   }
 
-  function numPaymentsBetweenTimestamps(uint timestamp1, uint timestamp2) {
+  function numPaymentsBetweenTimestamps(uint timestamp1, uint timestamp2) public view returns (uint) {
     require(timestamp1 >= timestamp2, "We require the first timestamp to be most recent");
     uint diffTimestamp1Funding = timestamp1 - _timeLoanStart;
     uint numTimestamp1PaymentsSinceFunding = diffTimestamp1Funding / _secondsBetweenPayments;
@@ -182,11 +182,11 @@ contract Loan {
     return numTimestamp1PaymentsSinceFunding - numTimestamp2PaymentsSinceFunding;
   }
 
-  function calculateInterest(uint owed, uint numPayments) {
+  function calculateInterest(uint owed, uint numPayments) public view returns (uint) {
     uint secondsPerYear = 365*86400 + 86400/4; //365.25 * seconds/day
     uint ratePerMilPayment = (_interestRatePerMil * _secondsBetweenPayments)/secondsPerYear;
     uint milAugmentInterest = owed * ((1000000 + ratePerMilPayment) ** numPayments);
-    uint newAmountOwed = milAugmentInterest / (1000000 ** numPaymentsSinceLastCalculated);
+    uint newAmountOwed = milAugmentInterest / (1000000 ** numPayments);
     return newAmountOwed - owed;
   }
 
