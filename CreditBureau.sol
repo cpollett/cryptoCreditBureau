@@ -233,9 +233,15 @@ contract Loan {
      */
   }
 
-  function findDelinquents() public view returns (address[] memory, uint[] memory) {
-    assert(false);
+  function withdraw(uint amount) public {
+    uint current$$$=address(this).balance;   
+    require(current$$$ - amount >= 0, "Insufficient funds in the account");
+    require(_investors[msg.sender] >= amount, "Withdraw less or equal your investment");  
+   //FIXME to include interest rate
+    _investors[msg.sender] =  _investors[msg.sender] - amount;
+    payable(msg.sender).transfer(amount);
   }
+
 }
 
 struct FicoScore {
