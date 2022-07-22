@@ -40,10 +40,6 @@ contract CreditBureau {
       _creditScores[tx.origin].score += amount;
   }
 
-  function loanPaymentScoreUpdate(address client, address loan, uint amount) public {
-    require(msg.sender == loan, "");
-  }
-
   // I'm not totally sure that this function is needed
   /*function addRealEntity(address client, uint ssn) public {
     require(msg.sender == notary,
